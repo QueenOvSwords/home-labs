@@ -106,4 +106,6 @@ To make further attempts while testing, it was useful for me to utilize this com
 
 With this jail configuration, I was successfully banned, but with the short wordlist of 15 passwords, hydra finds the password before the ban is applied. I tried with a longer wordlist of 50 passwords, placing `dragon` in position 43. In this case, my IP was banned before the password is found and Hydra does not complete the list. 
 
+![](screenshots/ssh-brute-force/50-wordlist-failure.png)
+
 This highlights the importance of avoiding common passwords, often placed near the top of popular wordlists like `rockyou.txt`. Where their early placement on the list could allow brute-force attacks to succeed before tools like Fail2Ban can detect and block the attempt.
