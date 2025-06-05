@@ -31,7 +31,6 @@ def count_recent_syns(ip_logs):
         if count >= SCAN_THRESHOLD:
             ips_to_block.add(ip)
 
-    ips_to_block.add('1.3.4.3')
     return ips_to_block
 
 def parse_logs():
