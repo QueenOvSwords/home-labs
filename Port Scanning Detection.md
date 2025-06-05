@@ -31,3 +31,115 @@ Next I performed the SYN scan from Kali on 12 common ports:
 Checking `/var/log/syslog` confirmed that the logging rules works, showing 12 log entries with the `"SYN_SCAN_ATTEMPT"` prefix and the port number that was scanned.
 
 ![](screenshots/port-scanning/manual-detection.png)
+
+## Detection & Blocking with Script and Cron Job
+
+I created a Python script that will check syslog for this prefix and determine if an IP is making too many SYN scans and if so, will block the IP using `nftables`.
+
+The script will keep a text file list of IPs that have been blocked to avoid trying to ban them multiple times:
+
+```
+def main():
+    # Open or create a file to keep track of blocked IPs
+    try:
+        with open(BLOCKED_IPS_FILE, 'r') as file:
+            already_blocked = set(line.strip() for line in file)
+    except FileNotFoundError:
+        already_blocked = set()
+    
+    # Parse logs and return any IPs conducting too many port scans
+    ips_to_block = parse_logs()
+
+    # Block the malicious IP addresses and write them to the blocked IPs file
+    with open(BLOCKED_IPS_FILE, 'a') as file:
+        for ip in ips_to_block:
+            if ip not in already_blocked:
+                block_ip(ip)
+                file.write(f"{ip}\n")
+```
+
+The next part of the script will extract timestamps and IPs from syslog and identify IP addresses than have performed more than a set threshold (10) of SYN scans in the past minute, since I plan to run this as a cron job each minute. 
+
+```
+def count_recent_syns(ip_logs):
+    ips_to_block = set()
+
+    for ip, timestamps in ip_logs.items():
+        # Count log entries from unique IPs in the chosen timeframe 
+        count = 0
+        
+        for timestamp in timestamps: 
+            timestamp = datetime.fromisoformat(timestamp.split("+")[0])
+            
+            if (datetime.now() - timestamp).total_seconds() <= SCAN_TIMEFRAME:
+                count += 1
+        # Add IP to block list if count has reached the chosen threshold
+        if count >= SCAN_THRESHOLD:
+            ips_to_block.add(ip)
+            
+    return ips_to_block
+
+def parse_logs():
+    ip_logs = defaultdict(list)
+
+    # Search entries of syslog for the SYS_SCAN_ATTEMPTS-- prefix
+    with open(LOG_FILE, 'r') as file:
+        for line in file:
+            if LOG_PREFIX in line:
+                # Add source IPs of each SYN scan log 
+                for part in line.split():
+                    if part.startswith("SRC="):
+                        ip = part.split("=")[1]
+                        # Add each timestamp of log entries from that IP to ip_logs defualtdict
+                        ip_logs[ip].append(line.split()[0])
+    
+    return count_recent_syns(ip_logs)
+```
+
+These timing and threshold values can be altered in the defined constants:
+
+```
+BLOCKED_IPS_FILE = "blocked_ips.txt"
+LOG_FILE = "/var/log/syslog"
+LOG_PREFIX = "SYN_SCAN_ATTEMPT--"
+SCAN_THRESHOLD = 10
+SCAN_TIMEFRAME = 60
+```
+
+In order for the script to run commands to block the IP addresses, `nftables` needs to be set up to hold a list of IPs and block drop traffic from the ones added to the `blocked_ips` set.
+
+```
+sudo nft add set ip filter blocked_ips '{ type ipv4_addr; flags interval; }'
+sudo nft add rule ip filter input ip saddr @blocked_ips drop
+```
+
+Running `sudo nft list ruleset` should show the ip filter table similar to this:
+
+![](screenshots/port-scanning/ip-filter.png)
+
+My script then uses subprocess to run the command to add each ip to the blocked_ips set:
+
+```
+def block_ip(ip):
+    # Block the IP with nftables
+    cmd = ["sudo", "nft", "add", "element", "ip", "filter", "blocked_ips", f"{{ {ip} }}"]
+    subprocess.run(cmd)
+```
+
+I ran another nmap scan and ran the below command to show all IPs that have been blocked. :
+
+`sudo nft list set ip filter blocked_ips`
+
+![](screenshots/port-scanning/blocked-ips-nftables.png)
+
+This will match the IP kept in `blocked-ips.txt`
+
+![](screenshots/port-scanning/blocked-ips-txt.png)
+
+I hardcoded '1.3.4.3' to check that multiple IPs would be added, `192.168.56.4` is my Kali IP that was blocked after the nmap scan. Attempting to scan again returns all ports as 'filtered', implying the scans are being blocked with by a firewall.
+
+![](screenshots/port-scanning/filtered-nmap.png)
+
+The following command can be used to unban an IP:
+
+`sudo nft delete element ip filter blocked_ips { 1.2.3.4 }`
