@@ -32,7 +32,7 @@ Checking `/var/log/syslog` confirmed that the logging rule works, showing 12 log
 
 ![](screenshots/port-scanning/manual-detection.png)
 
-## Detection & Blocking with Script and Cron Job
+## Detection & Blocking with Script
 
 I created a Python script that will check syslog for this prefix and determine if an IP is making too many SYN scans and if so, will block the IP using `nftables`.
 
