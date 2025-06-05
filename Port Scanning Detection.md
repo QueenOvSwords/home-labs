@@ -143,3 +143,17 @@ I hardcoded '1.3.4.3' to check that multiple IPs would be added, `192.168.56.4` 
 The following command can be used to unban an IP:
 
 `sudo nft delete element ip filter blocked_ips { 1.2.3.4 }`
+
+## Running with Cron
+
+The command `crontab -e` is used to set the script to run with cron by adding the following line. This will run the script every minute and write print output and debugging info to a file called scan_debug.log.
+
+`* * * * * /path/to/port-scan-detection.py >> /home/ubuntu/scan_debug.log 2>&1`
+
+Since the command to add IPs to `nftables` uses sudo, I had to allow the `nft` command to be run without a password. This not a huge security concern since the script uses an array-style subprocess command and does not involve a shell or allow a user to inject their own commands, as shown below:
+
+`cmd = ["sudo", "nft", "add", "element", "ip", "filter", "blocked_ips", f"{{ {ip} }}"]`
+
+Allowing nft to run witout a password can be done with the command `sudo visudo` and adding the line:
+
+`[USERNAME] ALL=(ALL) NOPASSWD: /usr/sbin/nft`
