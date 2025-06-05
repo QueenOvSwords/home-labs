@@ -28,7 +28,7 @@ Next I performed the SYN scan from Kali on 12 common ports:
 
 ![](screenshots/port-scanning/nmap-scan.png)
 
-Checking `/var/log/syslog` confirmed that the logging rules works, showing 12 log entries with the `"SYN_SCAN_ATTEMPT"` prefix and the port number that was scanned.
+Checking `/var/log/syslog` confirmed that the logging rule works, showing 12 log entries with the `"SYN_SCAN_ATTEMPT"` prefix and the port number that was scanned.
 
 ![](screenshots/port-scanning/manual-detection.png)
 
@@ -106,7 +106,7 @@ SCAN_THRESHOLD = 10
 SCAN_TIMEFRAME = 60
 ```
 
-In order for the script to run commands to block the IP addresses, `nftables` needs to be set up to hold a list of IPs and block drop traffic from the ones added to the `blocked_ips` set.
+In order for the script to run commands to block the IP addresses, `nftables` needs to be set up to hold a list of IPs and drop traffic from the ones added to the `blocked_ips` set.
 
 ```
 sudo nft add set ip filter blocked_ips '{ type ipv4_addr; flags interval; }'
